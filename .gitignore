@@ -1,0 +1,10 @@
+# Compiled output — users build locally via install.ps1
+*.exe
+*.dll
+*.pdb
+
+# Editor / OS cruft
+.vs/
+*.user
+Thumbs.db
+desktop.ini
