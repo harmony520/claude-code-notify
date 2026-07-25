@@ -87,6 +87,16 @@ static class Program {
             for(int i=0;i<args.Length;i++){sb.Append(" \"");sb.Append(args[i].Replace("\"","\\\""));sb.Append('"');}
             var psi=new ProcessStartInfo(Application.ExecutablePath,sb.ToString());
             psi.UseShellExecute=false;
+            // Redirect the child's standard streams. With UseShellExecute=false the
+            // child otherwise INHERITS our stdout/stderr handles, and since it lives
+            // on for the popup's lifetime it keeps the hook's output pipe open long
+            // after we exit -- Claude Code reads that pipe until EOF, so every hook
+            // fire stalled for seconds. Redirecting hands the child fresh pipes we
+            // never read, so our own handles close the moment we return.
+            psi.RedirectStandardOutput=true;
+            psi.RedirectStandardError=true;
+            psi.RedirectStandardInput=true;
+            psi.CreateNoWindow=true;
             try{Process.Start(psi);}catch{}
             return;
         }
