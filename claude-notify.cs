@@ -45,7 +45,32 @@ static class Native {
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int cmd);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] public static extern void keybd_event(byte vk,byte scan,uint flags,IntPtr extra);
     [DllImport("dwmapi.dll")] public static extern int  DwmSetWindowAttribute(IntPtr hwnd,int attr,ref int val,int sz);
+
+    const byte VK_MENU      = 0x12;   // Alt
+    const uint KEYEVENTF_UP = 0x0002;
+
+    // Pull a window to the foreground from a background process.
+    //
+    // Windows only lets a process steal the foreground if it "owns" recent user
+    // input. A detached popup process doesn't qualify, so SwitchToThisWindow and
+    // even AttachThreadInput get silently ignored. Tapping Alt makes the OS treat
+    // us as having just received input, which lifts the foreground lock for the
+    // call that follows.
+    public static void ForceForeground(IntPtr h) {
+        if(h==IntPtr.Zero) return;
+        if(IsIconic(h)) ShowWindow(h,9);                  // SW_RESTORE
+        if(GetForegroundWindow()==h) return;
+        try {
+            keybd_event(VK_MENU,0,0,IntPtr.Zero);
+            keybd_event(VK_MENU,0,KEYEVENTF_UP,IntPtr.Zero);
+        } catch {}
+        SetForegroundWindow(h);
+        if(GetForegroundWindow()!=h) SwitchToThisWindow(h,true);   // last resort
+    }
 }
 
 static class Sounds {
@@ -265,8 +290,7 @@ class ToastForm : Form {
     static void FocusClaude(uint sessionPid){
         IntPtr h=FindClaudeWindow(sessionPid);
         if(h==IntPtr.Zero)return;
-        if(Native.IsIconic(h))Native.ShowWindow(h,9);
-        Native.SwitchToThisWindow(h,true);
+        Native.ForceForeground(h);
     }
     // Find the terminal window running Claude Code. When sessionPid (CLAUDE_PID)
     // is known we first try process-tree matching: pick the window whose owning
